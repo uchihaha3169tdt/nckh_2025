@@ -87,9 +87,10 @@ def main(args, data, model, diffusion, epoch):
         model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * 2.5
         
         sample_fn = diffusion.p_sample_loop
+        _model = model.module if hasattr(model, 'module') else model
         sample = sample_fn(
             model,
-            (args.batch_size, model.in_channels, 1, ground_truth.shape[-1]),  # BUG FIX
+            (args.batch_size, _model.in_channels, 1, ground_truth.shape[-1]),  # BUG FIX
             clip_denoised=False,
             model_kwargs=model_kwargs,
             skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
@@ -111,7 +112,8 @@ def main(args, data, model, diffusion, epoch):
     
         lengths = model_kwargs['y']['lengths'].to(dist_util.dev())
         texts = model_kwargs['y']['text']
-        model_kwargs['y']['text_embed'] = model.encode_text(model_kwargs['y']['text'])
+        _model = model.module if hasattr(model, 'module') else model
+        model_kwargs['y']['text_embed'] = _model.encode_text(model_kwargs['y']['text'])
 
         batch_dtw = []
         # batch_fid = []
@@ -169,6 +171,32 @@ def done_main():
     n_frames = max_frames = 500
     fps = 25
 
+    # ============ GPU Detection ============
+    num_gpus = torch.cuda.device_count()
+    if num_gpus > 0:
+        print(f"\n{'='*60}")
+        print(f"  GPU DETECTION: Found {num_gpus} GPU(s)")
+        print(f"{'='*60}")
+        for i in range(num_gpus):
+            gpu_name = torch.cuda.get_device_name(i)
+            gpu_mem = torch.cuda.get_device_properties(i).total_mem / (1024**3)
+            print(f"  GPU {i}: {gpu_name} | {gpu_mem:.1f} GB")
+        print(f"{'='*60}")
+        if num_gpus > 1:
+            print(f"  => Will use ALL {num_gpus} GPUs with DataParallel")
+        else:
+            print(f"  => Will use GPU 0")
+        print(f"{'='*60}\n")
+    else:
+        print("\n[WARNING] No GPU detected! Running on CPU (will be very slow).\n")
+
+    # Set device to first GPU (DataParallel will handle multi-GPU)
+    if num_gpus > 0:
+        args.device = 0  # Primary GPU
+    else:
+        args.device = -1  # CPU
+    # ========================================
+
     is_using_data = not any([args.input_text, args.text_prompt, args.action_file, args.action_name])
     dist_util.setup_dist(args.device)
     if out_path == '':
@@ -225,6 +253,14 @@ def done_main():
         print(f"********************************* NOOOO guidance_param={args.guidance_param}")
     
     model.to(dist_util.dev())
+
+    # ============ Multi-GPU with DataParallel ============
+    if num_gpus > 1 and torch.cuda.is_available():
+        gpu_ids = list(range(num_gpus))
+        model = torch.nn.DataParallel(model, device_ids=gpu_ids)
+        print(f"Model wrapped with DataParallel on GPUs: {gpu_ids}")
+    # =====================================================
+
     model.eval()  # disable random masking
     model.requires_grad_(False)
     all_gt_motions = []
@@ -256,9 +292,11 @@ def done_main():
             model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
             
         sample_fn = diffusion.p_sample_loop
+        # Handle DataParallel: access in_channels from .module if wrapped
+        _model = model.module if hasattr(model, 'module') else model
         sample = sample_fn(
             model,
-            (args.batch_size, model.in_channels, 1, n_frames),  # BUG FIX
+            (args.batch_size, _model.in_channels, 1, n_frames),  # BUG FIX
             clip_denoised=False,
             model_kwargs=model_kwargs,
             skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
@@ -431,8 +469,9 @@ def plot_video(joints,
         frame = np.ones((650, 650, 3), np.uint8) * 255
 
 
-        # Reduce the frame joints down to 2D for visualisation - Frame joints 2d shape is (48,2)
-        frame_joints_2d = np.reshape(frame_joints, (50, 3))[:, :2]
+        # Reduce the frame joints down to 2D for visualisation
+        num_joints = len(frame_joints) // 3
+        frame_joints_2d = np.reshape(frame_joints, (num_joints, 3))[:, :2]
 
         # Draw the frame given 2D joints
         draw_frame_2D(frame, frame_joints_2d)
@@ -453,8 +492,9 @@ def plot_video(joints,
             # Cut off the percent_tok and multiply each joint by 3 (as was reduced in training files)
 #             ref_joints = ref_joints[:] * 3
 
-            # Reduce the frame joints down to 2D- Frame joints 2d shape is (48,2)
-            ref_joints_2d = np.reshape(ref_joints, (50, 3))[:, :2]
+            # Reduce the frame joints down to 2D
+            ref_num_joints = len(ref_joints) // 3
+            ref_joints_2d = np.reshape(ref_joints, (ref_num_joints, 3))[:, :2]
 
             # Draw these joints on the frame
             draw_frame_2D(ref_frame, ref_joints_2d)
@@ -629,7 +669,7 @@ def draw_frame_2D(frame, joints):
 
     # Increase the size and position of the joints
     joints = joints * 10 * 12 * 2
-    joints = joints + np.ones((50, 2)) * offset
+    joints = joints + np.ones((joints.shape[0], 2)) * offset
 
     # Loop through each of the bone structures, and plot the bone
     for j in range(number):

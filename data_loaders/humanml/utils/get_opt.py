@@ -30,23 +30,22 @@ def get_opt(opt_path, device):
     opt = Namespace()
     opt_dict = vars(opt)
 
-    skip = ('-------------- End ----------------',
-            '------------ Options -------------',
-            '\n')
+
     print('Reading | ', opt_path)
     with open(opt_path) as f:
         for line in f:
-            if line.strip() not in skip:
-                # print(line.strip())
-                key, value = line.strip().split(': ')
-                if value in ('True', 'False'):
-                    opt_dict[key] = bool(value)
-                elif is_float(value):
-                    opt_dict[key] = float(value)
-                elif is_number(value):
-                    opt_dict[key] = int(value)
-                else:
-                    opt_dict[key] = str(value)
+            line = line.strip()
+            if line == '' or line.startswith('---') or ': ' not in line:
+                continue
+            key, value = line.split(': ', 1)
+            if value in ('True', 'False'):
+                opt_dict[key] = bool(value)
+            elif is_float(value):
+                opt_dict[key] = float(value)
+            elif is_number(value):
+                opt_dict[key] = int(value)
+            else:
+                opt_dict[key] = str(value)
 
     # print(opt)
     opt_dict['which_epoch'] = 'latest'

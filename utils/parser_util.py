@@ -152,6 +152,14 @@ def add_sampling_options(parser):
                        help="Number of repetitions, per sample (text prompt/action)")
     group.add_argument("--guidance_param", default=2.5, type=float,
                        help="For classifier-free sampling - specifies the s parameter, as defined in the paper.")
+    group.add_argument("--timestep_respacing", default='', type=str,
+                       help="Timestep respacing for faster DDIM sampling. "
+                            "Examples: 'ddim50', 'ddim100', 'ddim200'. "
+                            "Empty string '' uses all diffusion steps (slowest but best quality).")
+    group.add_argument("--skip_timesteps", default=0, type=int,
+                       help="Number of initial diffusion timesteps to skip during sampling. "
+                            "Reduces total denoising steps. Recommended: 0-300 for T=1000.")
+
 
 
 def add_generate_options(parser):

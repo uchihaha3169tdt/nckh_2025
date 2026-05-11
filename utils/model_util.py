@@ -92,7 +92,9 @@ def create_gaussian_diffusion(args):
     predict_xstart = True  # we always predict x_start (a.k.a. x0), that's our deal!
     steps = args.diffusion_steps
     scale_beta = 1.  # no scaling
-    timestep_respacing = ''  # can be used for ddim sampling, we don't use it.
+    # Use timestep_respacing from args if provided (e.g. 'ddim50', 'ddim100')
+    # Otherwise use all steps (full diffusion)
+    timestep_respacing = getattr(args, 'timestep_respacing', '')
     learn_sigma = False
     rescale_timesteps = False
 
@@ -101,6 +103,11 @@ def create_gaussian_diffusion(args):
 
     if not timestep_respacing:
         timestep_respacing = [steps]
+    
+    if isinstance(timestep_respacing, str) and timestep_respacing.startswith('ddim'):
+        print(f"*** DDIM Respacing: {timestep_respacing} (from {steps} steps)")
+    else:
+        print(f"*** Full diffusion: {steps} steps")
 
     return SpacedDiffusion(
         use_timesteps=space_timesteps(steps, timestep_respacing),

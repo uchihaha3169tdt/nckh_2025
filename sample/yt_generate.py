@@ -684,7 +684,10 @@ def main(args, data, model, diffusion, epoch):
 def done_main():
     """
     Standalone generation: load model, generate samples, visualize and save.
+    Uses DDIM sampling for faster generation.
+    Supports --timestep_respacing (e.g. 'ddim100') and --skip_timesteps.
     """
+    import time
     split = "test"
 
     args = generate_args()
@@ -699,7 +702,30 @@ def done_main():
     max_frames = 500
     fps = 25
     n_frames = max_frames = min(max_frames, int(args.motion_length * fps))
-    print(f"======================= NUM OF FRAMES = {n_frames}")
+
+    # ============ GPU Detection ============
+    num_gpus = torch.cuda.device_count()
+    print(f"\n{'='*60}")
+    print(f"  YOUTUBE SIGN DDIM GENERATOR")
+    print(f"{'='*60}")
+    if num_gpus > 0:
+        for i in range(num_gpus):
+            gpu_name = torch.cuda.get_device_name(i)
+            gpu_mem = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+            print(f"  GPU {i}: {gpu_name} | {gpu_mem:.1f} GB")
+    else:
+        print("  [WARNING] No GPU detected! Running on CPU.")
+    print(f"  Frames: {n_frames} | FPS: {fps}")
+    respacing = getattr(args, 'timestep_respacing', '')
+    skip = getattr(args, 'skip_timesteps', 0)
+    print(f"  Sampling: DDIM | Respacing: {respacing if respacing else 'full (1000 steps)'} | Skip: {skip}")
+    print(f"  Guidance: {args.guidance_param}")
+    print(f"{'='*60}\n")
+
+    if num_gpus > 0:
+        args.device = 0
+    else:
+        args.device = -1
 
     is_using_data = not any([args.input_text, args.text_prompt, args.action_file, args.action_name])
     dist_util.setup_dist(args.device)
@@ -788,6 +814,7 @@ def done_main():
     all_text = []
 
     for rep_i in range(args.num_repetitions):
+        t_start = time.time()
         print(f'### Sampling [repetition #{rep_i}]')
 
         if args.guidance_param != 1:
@@ -801,7 +828,7 @@ def done_main():
             (args.batch_size, cfg_model.in_channels, 1, n_frames),
             clip_denoised=False,
             model_kwargs=model_kwargs,
-            skip_timesteps=0,
+            skip_timesteps=getattr(args, 'skip_timesteps', 0),
             init_image=None,
             progress=True,
             noise=None,
@@ -819,6 +846,8 @@ def done_main():
 
         all_motions.append(sample.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
+        t_elapsed = time.time() - t_start
+        print(f'### Repetition #{rep_i} done in {t_elapsed:.1f}s')
 
     all_motions = np.concatenate(all_motions, axis=0)[:total_num_samples]
 

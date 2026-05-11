@@ -127,90 +127,63 @@ def getSkeletalModelStructure():
     """
     bones = []
 
-    # ---- FACE connections (Pose joints 0-10) ----
-    # Nose → left eye
-    bones.append((0, 1, COLOR_FACE))     # nose → left_eye_inner
-    bones.append((1, 2, COLOR_FACE))     # left_eye_inner → left_eye
-    bones.append((2, 3, COLOR_FACE))     # left_eye → left_eye_outer
-    bones.append((3, 7, COLOR_FACE))     # left_eye_outer → left_ear
+    # Crawler Layout Mapping
+    # 0: Nose, 1: Neck (Mid-shoulder), 2: R_Shoulder, 3: R_Elbow, 4: R_Wrist
+    # 5: L_Shoulder, 6: L_Elbow, 7: L_Wrist
+    # 8-34: Face Mesh (27 points)
+    # 35-55: Left Hand (21 points)
+    # 56-76: Right Hand (21 points)
 
-    # Nose → right eye
-    bones.append((0, 4, COLOR_FACE))     # nose → right_eye_inner
-    bones.append((4, 5, COLOR_FACE))     # right_eye_inner → right_eye
-    bones.append((5, 6, COLOR_FACE))     # right_eye → right_eye_outer
-    bones.append((6, 8, COLOR_FACE))     # right_eye_outer → right_ear
+    # ---- TORSO & ARMS (Joints 0-7) ----
+    bones.append((0, 1, COLOR_TORSO))        # Nose -> Neck
+    
+    # Right Arm
+    bones.append((1, 2, COLOR_RIGHT_ARM))    # Neck -> R_Shoulder
+    bones.append((2, 3, COLOR_RIGHT_ARM))    # R_Shoulder -> R_Elbow
+    bones.append((3, 4, COLOR_RIGHT_ARM))    # R_Elbow -> R_Wrist
+    
+    # Left Arm
+    bones.append((1, 5, COLOR_LEFT_ARM))     # Neck -> L_Shoulder
+    bones.append((5, 6, COLOR_LEFT_ARM))     # L_Shoulder -> L_Elbow
+    bones.append((6, 7, COLOR_LEFT_ARM))     # L_Elbow -> L_Wrist
 
-    # Mouth
-    bones.append((9, 10, COLOR_MOUTH))   # mouth_left → mouth_right
-
-    # ---- TORSO connections ----
-    bones.append((11, 12, COLOR_TORSO))  # left_shoulder → right_shoulder
-    bones.append((11, 23, COLOR_TORSO))  # left_shoulder → left_hip
-    bones.append((12, 24, COLOR_TORSO))  # right_shoulder → right_hip
-    bones.append((23, 24, COLOR_TORSO))  # left_hip → right_hip
-
-    # Nose to mid-shoulder (visual reference)
-    # We draw nose → left_shoulder and nose → right_shoulder for neck approximation
-    bones.append((0, 11, COLOR_TORSO))
-    bones.append((0, 12, COLOR_TORSO))
-
-    # ---- LEFT ARM ----
-    bones.append((11, 13, COLOR_LEFT_ARM))   # left_shoulder → left_elbow
-    bones.append((13, 15, COLOR_LEFT_ARM))   # left_elbow → left_wrist
-
-    # ---- RIGHT ARM ----
-    bones.append((12, 14, COLOR_RIGHT_ARM))  # right_shoulder → right_elbow
-    bones.append((14, 16, COLOR_RIGHT_ARM))  # right_elbow → right_wrist
-
-    # ---- LEGS ----
-    bones.append((23, 25, COLOR_LEFT_LEG))   # left_hip → left_knee
-    bones.append((25, 27, COLOR_LEFT_LEG))   # left_knee → left_ankle
-    bones.append((27, 29, COLOR_LEFT_LEG))   # left_ankle → left_heel
-    bones.append((27, 31, COLOR_LEFT_LEG))   # left_ankle → left_foot_index
-    bones.append((29, 31, COLOR_LEFT_LEG))   # left_heel → left_foot_index
-
-    bones.append((24, 26, COLOR_RIGHT_LEG))  # right_hip → right_knee
-    bones.append((26, 28, COLOR_RIGHT_LEG))  # right_knee → right_ankle
-    bones.append((28, 30, COLOR_RIGHT_LEG))  # right_ankle → right_heel
-    bones.append((28, 32, COLOR_RIGHT_LEG))  # right_ankle → right_foot_index
-    bones.append((30, 32, COLOR_RIGHT_LEG))  # right_heel → right_foot_index
+    # ---- FACE (Joints 8-34) ----
+    # Just connect some face points to the nose for visual reference
+    # Or we can just let them be drawn as points by draw_frame_2D, 
+    # but let's connect a few to nose so they don't float completely disconnected.
+    for i in range(8, 35):
+        bones.append((0, i, COLOR_EXTRA))
 
     # ---- Wrist-to-Hand bridge ----
-    # Connect pose wrist to hand wrist (may overlap spatially)
-    bones.append((15, LHAND_START + 0, COLOR_LHAND_PALM))   # left_wrist(pose) → left_hand_wrist
-    bones.append((16, RHAND_START + 0, COLOR_RHAND_PALM))   # right_wrist(pose) → right_hand_wrist
+    # 7 is L_Wrist, 4 is R_Wrist
+    LHAND_START_IDX = 35
+    RHAND_START_IDX = 56
+    
+    bones.append((7, LHAND_START_IDX, COLOR_LHAND_PALM))   # L_Wrist -> L_Hand_Wrist
+    bones.append((4, RHAND_START_IDX, COLOR_RHAND_PALM))   # R_Wrist -> R_Hand_Wrist
 
-    # ---- LEFT HAND (joints 33-53) ----
-    lh = LHAND_START  # 33
-    # Palm connections (wrist to each finger MCP)
-    bones.append((lh + 0, lh + 1, COLOR_LHAND_PALM))   # wrist → thumb_cmc
-    bones.append((lh + 0, lh + 5, COLOR_LHAND_PALM))   # wrist → index_mcp
-    bones.append((lh + 0, lh + 9, COLOR_LHAND_PALM))   # wrist → middle_mcp
-    bones.append((lh + 0, lh + 13, COLOR_LHAND_PALM))  # wrist → ring_mcp
-    bones.append((lh + 0, lh + 17, COLOR_LHAND_PALM))  # wrist → pinky_mcp
+    # ---- LEFT HAND (Joints 35-55) ----
+    lh = LHAND_START_IDX
+    # Palm connections
+    bones.append((lh + 0, lh + 1, COLOR_LHAND_PALM))
+    bones.append((lh + 0, lh + 5, COLOR_LHAND_PALM))
+    bones.append((lh + 0, lh + 9, COLOR_LHAND_PALM))
+    bones.append((lh + 0, lh + 13, COLOR_LHAND_PALM))
+    bones.append((lh + 0, lh + 17, COLOR_LHAND_PALM))
     # Palm cross-links
-    bones.append((lh + 5, lh + 9, COLOR_LHAND_PALM))   # index_mcp → middle_mcp
-    bones.append((lh + 9, lh + 13, COLOR_LHAND_PALM))  # middle_mcp → ring_mcp
-    bones.append((lh + 13, lh + 17, COLOR_LHAND_PALM)) # ring_mcp → pinky_mcp
+    bones.append((lh + 5, lh + 9, COLOR_LHAND_PALM))
+    bones.append((lh + 9, lh + 13, COLOR_LHAND_PALM))
+    bones.append((lh + 13, lh + 17, COLOR_LHAND_PALM))
 
-    # Thumb: cmc → mcp → ip → tip
-    for i, idx in enumerate([1, 2, 3]):
-        bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[0]))
-    # Index: mcp → pip → dip → tip
-    for i, idx in enumerate([5, 6, 7]):
-        bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[1]))
-    # Middle: mcp → pip → dip → tip
-    for i, idx in enumerate([9, 10, 11]):
-        bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[2]))
-    # Ring: mcp → pip → dip → tip
-    for i, idx in enumerate([13, 14, 15]):
-        bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[3]))
-    # Pinky: mcp → pip → dip → tip
-    for i, idx in enumerate([17, 18, 19]):
-        bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[4]))
+    # Fingers
+    for i, idx in enumerate([1, 2, 3]): bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[0]))
+    for i, idx in enumerate([5, 6, 7]): bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[1]))
+    for i, idx in enumerate([9, 10, 11]): bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[2]))
+    for i, idx in enumerate([13, 14, 15]): bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[3]))
+    for i, idx in enumerate([17, 18, 19]): bones.append((lh + idx, lh + idx + 1, FINGER_COLORS_LEFT[4]))
 
-    # ---- RIGHT HAND (joints 54-74) ----
-    rh = RHAND_START  # 54
+    # ---- RIGHT HAND (Joints 56-76) ----
+    rh = RHAND_START_IDX
     # Palm connections
     bones.append((rh + 0, rh + 1, COLOR_RHAND_PALM))
     bones.append((rh + 0, rh + 5, COLOR_RHAND_PALM))
@@ -222,26 +195,12 @@ def getSkeletalModelStructure():
     bones.append((rh + 9, rh + 13, COLOR_RHAND_PALM))
     bones.append((rh + 13, rh + 17, COLOR_RHAND_PALM))
 
-    # Thumb
-    for i, idx in enumerate([1, 2, 3]):
-        bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[0]))
-    # Index
-    for i, idx in enumerate([5, 6, 7]):
-        bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[1]))
-    # Middle
-    for i, idx in enumerate([9, 10, 11]):
-        bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[2]))
-    # Ring
-    for i, idx in enumerate([13, 14, 15]):
-        bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[3]))
-    # Pinky
-    for i, idx in enumerate([17, 18, 19]):
-        bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[4]))
-
-    # ---- EXTRA FACE (joints 75-76) ----
-    # Connect extra face landmarks to nose (joint 0), if present
-    bones.append((0, 75, COLOR_EXTRA))
-    bones.append((0, 76, COLOR_EXTRA))
+    # Fingers
+    for i, idx in enumerate([1, 2, 3]): bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[0]))
+    for i, idx in enumerate([5, 6, 7]): bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[1]))
+    for i, idx in enumerate([9, 10, 11]): bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[2]))
+    for i, idx in enumerate([13, 14, 15]): bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[3]))
+    for i, idx in enumerate([17, 18, 19]): bones.append((rh + idx, rh + idx + 1, FINGER_COLORS_RIGHT[4]))
 
     return bones
 
